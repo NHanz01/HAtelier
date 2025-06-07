@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guide: Tree</title>
+  
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+
+  <!-- A-Frame + AR.js with GPS -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/jeromeetienne/AR.js@3.3.2/aframe/build/aframe-ar.min.js"></script>
+
+  <!-- Your logic -->
+  <script src="guideTree.js" defer></script>
+
+</head>
+<body>
+  <div id="menu">
+      <div id="info-guide">
+        <h3 style="text-align: center;">[ Welcome To The Guide! ]</h3>
+        <h4 style="text-align: center;">Try To Complete The Drawing Using These Gestures: </h4>
+        <ul>
+          <li>Peace Sign : Drawing</li>
+          <li>Open  Palm : Open Menu</li>
+          <li>Close Palm : Close Menu</li>
+        </ul>
+      </div>
+      <button id="home-button">Back to Main Menu</button>
+      <button id="clear-button">Clear All</button>
+  </div>
+  
+  <!-- MediaPipe video input (visible!) -->
+  <video id="input_video" autoplay playsinline></video>
+
+  <!-- Canvas for MediaPipe drawing -->
+  <canvas id="output_canvas"></canvas>
+  <div class="status-text" id="statusText">Gesture: None</div>
+  <div id="locationText"></div>
+
+  <!-- AR.js Scene with GPS camera -->
+  <a-scene
+    vr-mode-ui="enabled: false"
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false;">
+    
+    <a-camera gps-camera rotation-reader></a-camera>
+  </a-scene>
+
+</body>
+</html>
