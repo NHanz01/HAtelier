@@ -127,6 +127,7 @@
   justify-content: center;
 }
 
+.navbar button:hover,
 .navbar button:active {
   background-color: white;
   transform: scale(1.1); 
