@@ -97,6 +97,7 @@
 
 .navbar button {    
   flex: 0 0 auto;
+  aspect-ratio: 1 / 1;
   width: 50px !important;
   height: 50px !important;
   padding: 0;
