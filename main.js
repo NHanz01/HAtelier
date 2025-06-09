@@ -10,7 +10,8 @@ let currentSphereRadius = 0.1;
 const sphereColors = ["Red", "Orange", "Gold", "SpringGreen", "Cyan", "RoyalBlue", "Orchid", "Hotpink", "WhiteSmoke", "Black"];
 let currentColorIndex = 0;
 let currentSphereColor = sphereColors[currentColorIndex];
-const menu = document.querySelector(".navbar"); // or the correct selector for your nav bar
+const menu = document.querySelector(".navbar"); 
+const instruction = document.getElementById("menu");
 const colorButton = document.querySelector(".color-button");
 
 const buttons = document.querySelectorAll(".navbar button");
@@ -218,6 +219,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (isPeaceSign(landmarks)) {
           statusText.textContent = "Gesture: Peace Sign ✌️";
           menu.style.display = "none"; 
+          instruction.style.display = "none";
           drawing = true;
           drawLocalSphereFromLandmark(landmarks[8]);
         } else {
@@ -232,6 +234,7 @@ window.addEventListener('DOMContentLoaded', () => {
           } else if (isClosedPalm(landmarks)) {
             statusText.textContent = "Gesture: Menu Closed ✊";
             menu.style.display = "none"; 
+            instruction.style.display = "none"; 
           } else if (isIndexFinger(landmarks)) {
             statusText.textContent = "Gesture: Selecting Menu ☝️";
           } else {
@@ -307,7 +310,11 @@ function checkMenuHover(landmarks) {
             window.location.href = "./";
           }
           break;
-          
+
+        case "info":
+          instruction.style.display = "block";
+          break;
+
         case "undo":
           undoLastSphere();
           break;
@@ -316,10 +323,12 @@ function checkMenuHover(landmarks) {
           currentSphereRadius = Math.min(currentSphereRadius + 0.05, 0.3);
           locationText.innerHTML = `Size Increased to ${currentSphereRadius.toFixed(2)}`;
           break;
+
         case "size-decrease":
           currentSphereRadius = Math.max(currentSphereRadius - 0.05, 0.05);
           locationText.innerHTML = `Size Decreased to ${currentSphereRadius.toFixed(2)}`;
           break;
+
         case "color-cycle":
           currentColorIndex = (currentColorIndex + 1) % sphereColors.length;
           currentSphereColor = sphereColors[currentColorIndex];
@@ -349,7 +358,11 @@ buttons.forEach((btn) => {
           window.location.href = "./";
         }
         break;
-        
+      
+      case "info":
+      instruction.style.display = "block";
+      break;
+
       case "undo":
         undoLastSphere();
         break;

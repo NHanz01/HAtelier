@@ -24,12 +24,29 @@
   
   <div class="navbar">
     <button data-action="home"><img src="./assets/home.png" alt="Home" /></button>
+    <button data-action="info"><img src="./assets/info.png" alt="Info" /></button>
     <button data-action="undo"><img src="./assets/undo.png" alt="Undo" /></button>
     <button data-action="size-increase"><img src="./assets/increase.png" alt="Increase" /></button>
     <button data-action="size-decrease"><img src="./assets/decrease.png" alt="Decrease" /></button>
     <button data-action="color-cycle" class="color-button"></button>
     <button data-action="clearAll"><img src="./assets/trash.png" alt="Clear" /></button>
   </div>
+
+    <div id="menu">
+      <div id="info-guide">
+        <h2 style="text-align: center;">[ Welcome to HAtelier! ]</h2>
+        <h3 style="text-align: center;">INSTRUCTION:<br></h3>
+        <ul>
+          Hover your hand infront of the camera, and draw as you wish using these gestures:
+          <ul><br></ul>
+          <li>Open  Palm : Open Menu</li>
+          <li>Close Palm : Close Menu</li>
+          <li>Index Finger : Select Menu</li>
+          <li>Peace Sign : Drawing</li>
+        </ul>
+        <h4 style="text-align: center;">You may also select the items on the menu by touching or clicking on the icons! </h4>
+      </div>
+    </div>
 
   <!-- MediaPipe video input (visible!) -->
   <video id="input_video" autoplay playsinline></video>
