@@ -6,12 +6,12 @@ let visualAidSphere = null;
 let sunCompleted = false;
 
 // Sun center and rays configuration
-const center = new THREE.Vector2(0, 2);
+const center = new THREE.Vector2(0, 1.5);
 const rayCount = 7;
 const rayAngleStep = (2 * Math.PI) / rayCount;
 const spread = 0.4;         // Reduced spread to make triangles less wide
-const baseRadius = 0.6;     // Increase base radius to space out triangles more
-const rayLength = 1.4;      // Increase ray length to make triangles taller
+const baseRadius = 0.4;     // Increase base radius to space out triangles more
+const rayLength = 1.2;      // Increase ray length to make triangles taller
 
 // Compute the vertices of each triangle ray in 2D space
 const rayTriangles = [];
@@ -35,8 +35,31 @@ for (let i = 0; i < rayCount; i++) {
   rayTriangles.push([baseLeft, tip, baseRight]);
 }
 
-// Track which rays have been drawn on
-const coverage = new Array(rayCount).fill(false);
+// Number of sample checkpoints per edge
+const samplesPerEdge = 5;
+
+// Build a flat list of checkpoints
+const checkpoints = [];
+
+rayTriangles.forEach(tri => {
+  const [A, B, C] = tri;
+  // function to sample n points between two vertices (excluding endpoints)
+  function sampleEdge(p1, p2) {
+    const pts = [];
+    for (let i = 1; i <= samplesPerEdge; i++) {
+      const t = i / (samplesPerEdge + 1);
+      pts.push(new THREE.Vector2(
+        THREE.MathUtils.lerp(p1.x, p2.x, t),
+        THREE.MathUtils.lerp(p1.y, p2.y, t)
+      ));
+    }
+    return pts;
+  }
+  checkpoints.push(...sampleEdge(A, B), ...sampleEdge(B, C), ...sampleEdge(C, A));
+});
+
+// Track hits for each checkpoint
+const hitCheckpoints = new Array(checkpoints.length).fill(false);
 
 // Geolocation
 if (navigator.geolocation) {
@@ -100,34 +123,29 @@ function distancePointToSegment(p, a, b) {
   return p.distanceTo(closest);
 }
 
-// Find closest ray index if point is near any edge (threshold 0.1)
-function findClosestRayIndex(p) {
-  const threshold = 0.05;
-  for (let i = 0; i < rayTriangles.length; i++) {
-    const [a, b, c] = rayTriangles[i];
-    // Check distance to edges AB, BC, CA
-    const dAB = distancePointToSegment(p, a, b);
-    const dBC = distancePointToSegment(p, b, c);
-    const dCA = distancePointToSegment(p, c, a);
-    if (dAB <= threshold || dBC <= threshold || dCA <= threshold) {
+// threshold for “hitting” a checkpoint
+const checkpointThreshold = 0.05;
+
+function findClosestCheckpointIndex(p) {
+  for (let i = 0; i < checkpoints.length; i++) {
+    if (p.distanceTo(checkpoints[i]) <= checkpointThreshold) {
       return i;
     }
   }
   return -1;
 }
 
-// Mark a ray as covered
-function markRayCoverage(index) {
-  if (index >= 0 && !coverage[index]) {
-    coverage[index] = true;
+function markCheckpoint(index) {
+  if (index >= 0 && !hitCheckpoints[index]) {
+    hitCheckpoints[index] = true;
   }
 }
 
 // PERCENTAGE SUCCESS 
-function isSunCovered() {
-  const coveredCount = coverage.filter(v => v).length;
-  const coverageRatio = coveredCount / coverage.length;
-  return coverageRatio >= 0.8; 
+function isSunCompleted() {
+  const hitCount = hitCheckpoints.filter(v => v).length;
+  const ratio = hitCount / hitCheckpoints.length;
+  return ratio >= 0.5;
 }
 
 
@@ -143,10 +161,12 @@ function drawRaySphere(pos) {
   document.querySelector("a-scene").appendChild(sphere);
   locationText.innerHTML = `🎨 Drawing sun rays`;
 
-  const index = findClosestRayIndex(pos);
-  markRayCoverage(index);
+  const cpIndex = findClosestCheckpointIndex(pos);
+  markCheckpoint(cpIndex);
 
-  if (isSunCovered()) showSuccessSun();
+  if (isSunCompleted()) {
+    showSuccessSun();
+  }
 }
 
 function deleteAllSpheres() {
@@ -200,9 +220,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Add center sphere (gold)
   const centerSphere = document.createElement("a-sphere");
-  centerSphere.setAttribute("radius", "0.4");
+  centerSphere.setAttribute("radius", "0.3");
   centerSphere.setAttribute("color", "gold");
-  centerSphere.setAttribute("position", "0 2 -4");
+  centerSphere.setAttribute("position", "0 1.5 -4");
   document.querySelector("a-scene").appendChild(centerSphere);
 
   function onResults(results) {
@@ -216,21 +236,21 @@ window.addEventListener('DOMContentLoaded', () => {
       drawLandmarks(canvasCtx, landmarks, { color: "#007FFF", lineWidth: 2 });
 
       const fingerX = (landmarks[8].x - 0.5) * 1.5;
-      const fingerY = (0.5 - landmarks[8].y) * 1.5 + 2;
+      const fingerY = (0.5 - landmarks[8].y) * 1.5 + 1.5;
       const fingerPos = new THREE.Vector2(fingerX, fingerY);
       const fixedZ = -4;
 
-      const closestRay = findClosestRayIndex(fingerPos);
+      const closestCheckpoint = findClosestCheckpointIndex(fingerPos);
 
       if (!visualAidSphere) {
         visualAidSphere = document.createElement("a-sphere");
-        visualAidSphere.setAttribute("radius", "0.04");
-        visualAidSphere.setAttribute("opacity", "0.7");
+        visualAidSphere.setAttribute("radius", "0.07");
+        visualAidSphere.setAttribute("opacity", "0.5");
         document.querySelector("a-scene").appendChild(visualAidSphere);
       }
 
       // Change color based on proximity to ray edges
-      if (closestRay !== -1) {
+      if (closestCheckpoint !== -1) {
         visualAidSphere.setAttribute("color", "orange");
       } else {
         visualAidSphere.setAttribute("color", "red");
@@ -243,9 +263,9 @@ window.addEventListener('DOMContentLoaded', () => {
       if (isPeaceSign(landmarks) && !sunCompleted) {
         drawing = true;
         document.getElementById("menu").style.display = "none";
-        if (closestRay !== -1) {
-          markRayCoverage(closestRay);
-          drawRaySphere(fingerPos);
+        if (closestCheckpoint !== -1) {
+           markCheckpoint(closestCheckpoint);
+           drawRaySphere(fingerPos);
           statusText.textContent = "Drawing Sun Rays!";
         } else {
           statusText.textContent = "Move Finger Near Sun Rays!";
@@ -306,81 +326,86 @@ function showSuccessSun() {
   if (sunCompleted) return;
   sunCompleted = true;
 
-  // Remove all spawned spheres
+  // Remove drawn spheres and hide original rays & center
   document.querySelectorAll(".spawned-sphere").forEach(s => s.remove());
-
-  // Hide sun rays (triangles)
   for (let i = 0; i < rayCount; i++) {
     const ray = document.getElementById(`ray-${i}`);
     if (ray) ray.setAttribute("visible", "false");
   }
+  const origCenter = document.querySelector("a-sphere[color='gold']");
+  if (origCenter) origCenter.setAttribute("visible", "false");
 
-  // Hide the original center sphere
-  const centerSphere = document.querySelector("a-sphere[color='gold']");
-  if (centerSphere) centerSphere.setAttribute("visible", "false");
-
-  // Update label
+  // Update the on-screen label
   const label = document.getElementById("label-sun");
   if (label) {
-    label.setAttribute("value", "Amazing! Sun Completed ! \nOpen Menu To Go Back To Homepage !");
+    label.setAttribute("value", "Amazing! Sun Completed!\nOpen Menu to Go Back!");
+    label.setAttribute("position", "0 -0.5 -4.5");
   }
 
-  // Create sun spin entity
+  // Create a parent entity at the exact sun center
   const spinEntity = document.createElement("a-entity");
-  spinEntity.setAttribute("position", "0 2 -4");
+  spinEntity.setAttribute("position", `${center.x} ${center.y} -4`);
 
-  // Add 3D cone rays
+  // Parameters for ray spacing
+  const gapDistance = 0.2;  // how far to push each ray outward for spacing
+
+  // For each original ray, add a cone that points outward with gaps
   for (let i = 0; i < rayCount; i++) {
     const tri = rayTriangles[i];
+    // centroid of this triangle
     const midX = (tri[0].x + tri[1].x + tri[2].x) / 3;
-    const midY = (tri[0].y + tri[1].y + tri[2].y) / 3 - 2; // shift down since spinEntity is at y=2
+    const midY = (tri[0].y + tri[1].y + tri[2].y) / 3;
 
-    // Compute direction vector from origin to midpoint
-    const dir = new THREE.Vector3(midX, midY, 0).normalize();
+    // direction from sun center to centroid
+    const dir = new THREE.Vector3(
+      midX - center.x,
+      midY - center.y,
+      0
+    ).normalize();
 
-    // Create quaternion rotation to align +Y axis with direction vector
-    const quat = new THREE.Quaternion();
-    quat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    // compute rotation from +Y to dir
+    const quat = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      dir
+    );
+    const euler = new THREE.Euler().setFromQuaternion(quat, "XYZ");
+    const rx = THREE.MathUtils.radToDeg(euler.x);
+    const ry = THREE.MathUtils.radToDeg(euler.y);
+    const rz = THREE.MathUtils.radToDeg(euler.z);
 
-    const euler = new THREE.Euler().setFromQuaternion(quat, 'XYZ');
-    const rotation = {
-      x: THREE.MathUtils.radToDeg(euler.x),
-      y: THREE.MathUtils.radToDeg(euler.y),
-      z: THREE.MathUtils.radToDeg(euler.z)
-    };
+    // position relative to spinEntity, with added gap along dir
+    const posX = (midX - center.x) + dir.x * gapDistance;
+    const posY = (midY - center.y) + dir.y * gapDistance;
+    const posZ = dir.z * gapDistance; // zero unless you want 3D offset
 
     const cone = document.createElement("a-cone");
     cone.setAttribute("height", "0.8");
     cone.setAttribute("radius-bottom", "0.2");
     cone.setAttribute("radius-top", "0.01");
+    cone.setAttribute("position", `${posX} ${posY} ${posZ}`);
+    cone.setAttribute("rotation", `${rx} ${ry} ${rz}`);
     cone.setAttribute("color", "orange");
-    cone.setAttribute("opacity", "1");
-    cone.setAttribute("transparent", "true");
-    cone.setAttribute("position", `${midX} ${midY} 0`);
-    cone.setAttribute("rotation", `${rotation.x} ${rotation.y} ${rotation.z}`);
-
     spinEntity.appendChild(cone);
   }
 
-  // Add center sphere inside spinEntity
-  const center = document.createElement("a-sphere");
-  center.setAttribute("radius", "0.4");
-  center.setAttribute("color", "gold");
-  center.setAttribute("position", "0 0 0");
-  spinEntity.appendChild(center);
+  // Add the spinning sun core at (0,0,0) inside spinEntity
+  const centerSphere = document.createElement("a-sphere");
+  centerSphere.setAttribute("radius", "0.3");
+  centerSphere.setAttribute("color", "gold");
+  centerSphere.setAttribute("position", "0 0 0");
+  spinEntity.appendChild(centerSphere);
 
-  // Animate rotation (spin on Y axis)
-  spinEntity.setAttribute('animation', {
-    property: 'rotation',
-    to: '0 360 0',
+  // Animate rotation around Y
+  spinEntity.setAttribute("animation", {
+    property: "rotation",
+    to: "0 360 0",
     loop: true,
     dur: 4000,
-    easing: 'linear'
+    easing: "linear"
   });
 
+  // Append to scene and hide clear button
   document.querySelector("a-scene").appendChild(spinEntity);
-
-  // Hide the clear button
   const clearBtn = document.getElementById("clear-button");
   if (clearBtn) clearBtn.style.display = "none";
 }

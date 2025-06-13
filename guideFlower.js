@@ -20,6 +20,37 @@ for (let i = 0; i < petalCount; i++) {
   petalCenters.push(new THREE.Vector2(x, y));
 }
 
+// Generate checkpoints around each petal
+const checkpointsPerPetal = 6;
+const checkpointRadius = 0.3;
+const checkpointTolerance = 0.06;
+const checkpoints = [];
+
+for (let i = 0; i < petalCount; i++) {
+  const petalCheckpoints = [];
+  const center = petalCenters[i];
+  const baseAngle = i * petalAngleStep - Math.PI / 2;
+
+  for (let j = 0; j < checkpointsPerPetal; j++) {
+    const angle = baseAngle + (j / checkpointsPerPetal) * 2 * Math.PI;
+    const x = center.x + checkpointRadius * Math.cos(angle);
+    const y = center.y + checkpointRadius * Math.sin(angle);
+    petalCheckpoints.push({ pos: new THREE.Vector2(x, y), hit: false });
+  }
+  checkpoints.push(petalCheckpoints);
+}
+
+function isNearTorusRing(finger, petalCenter, petalRadius = 0.3, tubeRadius = 0.05) {
+  const dx = finger.x - petalCenter.x;
+  const dy = finger.y - petalCenter.y;
+  const dz = finger.z + 4.6; // Assuming torus Z is fixed at -4.6
+
+  const distXY = Math.sqrt(dx * dx + dy * dy);
+  const ringDist = Math.abs(distXY - petalRadius); // distance from finger to torus ring
+
+  return ringDist < tubeRadius * 1.5 && Math.abs(dz) < tubeRadius * 1.5;
+}
+
 // Track which petals have been drawn on
 const coverage = new Array(petalCount).fill(false);
 
@@ -79,57 +110,84 @@ function isClosedPalm(landmarks) {
   });
 }
 
-// Check if finger is close to a petal center within threshold
-function findClosestPetalIndex(pos) {
-  const radius = 0.3;
-  const tolerance = 0.05; // adjust for strictness of tracing
-  for (let i = 0; i < petalCenters.length; i++) {
-    const dist = pos.distanceTo(petalCenters[i]);
-    if (Math.abs(dist - radius) <= tolerance) {
-      return i;
+function tryHitCheckpoint(fingerPos) {
+  for (let i = 0; i < checkpoints.length; i++) {
+    for (let j = 0; j < checkpoints[i].length; j++) {
+      const cp = checkpoints[i][j];
+      if (!cp.hit && fingerPos.distanceTo(cp.pos) <= checkpointTolerance) {
+        cp.hit = true;
+        return i; // return petal index instead of true
+      }
     }
   }
-  return -1;
-}
-
-
-// Mark a petal as covered (drawn)
-function markPetalCoverage(index) {
-  if (index >= 0 && !coverage[index]) {
-    coverage[index] = true;
-  }
+  return -1; // no checkpoint hit
 }
 
 // CHECK SUCCESS COMPLETION OF THE DRAWING
-function isFlowerCovered() {
-  const count = coverage.filter(v => v).length;
-  //return count / petalCount >= 0.95;
-  return count === petalCount;
-
+function isFlowerCompleted() {
+  const total = checkpoints.length * checkpointsPerPetal;
+  let hitCount = 0;
+  for (const petal of checkpoints) {
+    for (const cp of petal) {
+      if (cp.hit) hitCount++;
+    }
+  }
+  return hitCount / total >= 0.8;
 }
 
-// Draw a red sphere on the petal center
+
 function drawPetalSphere(pos) {
   if (flowerCompleted) return;
 
   const z = -4;
+
+  // Check if the finger is close to any torus ring (freeform drawing allowed!)
+  let nearAnyPetal = false;
+  for (let center of petalCenters) {
+    const dx = pos.x - center.x;
+    const dy = pos.y - center.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const torusRadius = 0.3;
+    const tubeThickness = 0.05;
+
+    // Allow drawing if finger is within the torus ring band
+    if (Math.abs(dist - torusRadius) < tubeThickness * 2.2) {
+      nearAnyPetal = true;
+      break;
+    }
+  }
+
+  if (!nearAnyPetal) {
+    locationText.innerHTML = `❌ Not on petals`;
+    return;
+  }
+
+  // Always allow drawing when near the ring (no longer tied to checkpoint!)
   const sphere = document.createElement("a-sphere");
   sphere.setAttribute("position", `${pos.x} ${pos.y} ${z}`);
   sphere.setAttribute("color", "Orchid");
   sphere.setAttribute("radius", "0.09");
   sphere.classList.add("spawned-sphere");
   document.querySelector("a-scene").appendChild(sphere);
-  locationText.innerHTML = `🎨 Drawing on flower petals`;
-  
-  const index = findClosestPetalIndex(pos);
-  markPetalCoverage(index);
 
-  if (isFlowerCovered()) showSuccessFlower();
+  locationText.innerHTML = `🎨 Drawing on flower petals`;
+
+  // Check checkpoint hits quietly in the background
+  tryHitCheckpoint(pos);
+
+  // Check if 80% checkpoint coverage is reached
+  if (isFlowerCompleted()) showSuccessFlower();
 }
+
+
 
 function deleteAllSpheres() {
   document.querySelectorAll(".spawned-sphere").forEach(s => s.remove());
-  for (let i = 0; i < coverage.length; i++) coverage[i] = false;
+  for (let i = 0; i < checkpoints.length; i++) {
+    for (let j = 0; j < checkpoints[i].length; j++) {
+      checkpoints[i][j].hit = false;
+    }
+  }
   locationText.innerHTML = `✅ All Drawings Cleared`;
   setTimeout(() => { locationText.innerHTML = ""; }, 1000);
 }
@@ -201,8 +259,13 @@ window.addEventListener('DOMContentLoaded', () => {
       visualAidSphere.setAttribute("position", `${fingerX} ${fingerY} ${fixedZ}`);
 
       // Check proximity to petals
-      const closePetalIndex = findClosestPetalIndex(fingerPos);
-      const nearPetal = closePetalIndex !== -1;
+      let nearPetal = false;
+      for (let center of petalCenters) {
+        if (fingerPos.distanceTo(center) >= 0.3 - 0.07 && fingerPos.distanceTo(center) <= 0.3 + 0.07) {
+          nearPetal = true;
+          break;
+        }
+      }
 
       // Change color based on hit detection
       visualAidSphere.setAttribute("color", nearPetal ? "orchid" : "red");

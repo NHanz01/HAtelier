@@ -79,65 +79,121 @@ function nearEllipseEdge(pos, center, rx, ry, tolerance = 0.25) {
   return Math.abs(ellipseDist - 1) <= tolerance;
 }
 
-// Instead of booleans, store counts
-const coverage = {
-  face: 0,       // count of hits on face edge
-  ears: [0, 0],  // counts of hits on each ear edge
+//MUST HIT ALL CHECKPOINTS TO TRIGGER SUCCESS
+const checkpoints = {
+  face: [
+    new THREE.Vector2(0.5, 1.5),   // right
+    new THREE.Vector2(0, 2),       // top
+    new THREE.Vector2(-0.5, 1.5),  // left
+    new THREE.Vector2(0, 1),       // bottom
+  ],
+  ears: [
+    [ // left ear
+      new THREE.Vector2(-0.3, 2.5),
+      new THREE.Vector2(-0.45, 2.3),
+      new THREE.Vector2(-0.15, 2.3)
+    ],
+    [ // right ear
+      new THREE.Vector2(0.3, 2.5),
+      new THREE.Vector2(0.45, 2.3),
+      new THREE.Vector2(0.15, 2.3)
+    ]
+  ]
 };
 
-// Thresholds for Success Coverage
-const coverageThreshold = {
-  face: 50,   
-  ears: [20, 20], 
+const touched = {
+  face: new Array(checkpoints.face.length).fill(false),
+  ears: checkpoints.ears.map(ear => new Array(ear.length).fill(false))
 };
 
 function checkDrawingTarget(pos) {
-  // returns part name and increments coverage count if not reached threshold yet
-  if (coverage.face < coverageThreshold.face && nearCircleEdge(pos, faceCenter, faceRadius)) {
-    coverage.face++;
-    return "face";
-  }
-  for (let i = 0; i < ears.length; i++) {
-    if (coverage.ears[i] < coverageThreshold.ears[i] && nearEllipseEdge(pos, ears[i], earRadiusX, earRadiusY)) {
-      coverage.ears[i]++;
-      return `ear${i}`;
+  const tolerance = 0.15;
+
+  // Face
+  for (let i = 0; i < checkpoints.face.length; i++) {
+    if (!touched.face[i] && pos.distanceTo(checkpoints.face[i]) < tolerance) {
+      touched.face[i] = true;
+      return "face";
     }
   }
+
+  // Ears
+  for (let e = 0; e < checkpoints.ears.length; e++) {
+    for (let i = 0; i < checkpoints.ears[e].length; i++) {
+      if (!touched.ears[e][i] && pos.distanceTo(checkpoints.ears[e][i]) < tolerance) {
+        touched.ears[e][i] = true;
+        return `ear${e}`;
+      }
+    }
+  }
+
   return null;
 }
 
 function isBunnyComplete() {
-  return coverage.face >= coverageThreshold.face &&
-         coverage.ears.every((count, i) => count >= coverageThreshold.ears[i]);
+  const faceComplete = touched.face.every(Boolean);
+  const earsComplete = touched.ears.every(earPoints => earPoints.every(Boolean));
+  return faceComplete && earsComplete;
 }
 
 function drawBunnySphere(pos) {
   if (bunnyCompleted) return;
 
-  const part = checkDrawingTarget(pos);
-  if (part) {
-    // Mark coverage and draw sphere only if near an edge
-    if (isBunnyComplete()) {
-      showSuccessBunny();
-      return;
-    }
-
-    const sphere = document.createElement("a-sphere");
-    sphere.setAttribute("position", `${pos.x} ${pos.y} -4`);
-    sphere.setAttribute("color", "Hotpink");
-    sphere.setAttribute("radius", "0.09");
-    sphere.classList.add("spawned-sphere");
-    document.querySelector("a-scene").appendChild(sphere);
-    locationText.innerHTML = `🎨 Drawing bunny`;
-  } else {
+  // Allow drawing only if on bunny shape
+  if (!isOnBunnyShape(pos)){
     locationText.innerHTML = "👉 Move closer to bunny edges to draw";
+    return;
   }
+
+  // Draw sphere
+  const sphere = document.createElement("a-sphere");
+  sphere.setAttribute("position", `${pos.x} ${pos.y} -4`);
+  sphere.setAttribute("color", "Hotpink");
+  sphere.setAttribute("radius", "0.09");
+  sphere.classList.add("spawned-sphere");
+  document.querySelector("a-scene").appendChild(sphere);
+
+  locationText.innerHTML = `🎨 Drawing bunny`;
+
+  // Track checkpoints (but don’t block drawing if not on them)
+  checkDrawingTarget(pos);
+
+  // If all checkpoints reached, complete the bunny
+  if (isBunnyComplete()) {
+    showSuccessBunny();
+  }
+}
+
+function isOnBunnyShape(pos) {
+  const zThreshold = -4; // Match bunny depth
+  if (Math.abs(pos.z - zThreshold) > 0.2) return false;
+
+  // Face center and radius
+  const faceCenter = { x: 0, y: 1.5 };
+  const faceDist = Math.sqrt((pos.x - faceCenter.x) ** 2 + (pos.y - faceCenter.y) ** 2);
+  const faceTolerance = 0.15;
+  const onFace = faceDist >= faceRadius - faceTolerance && faceDist <= faceRadius + faceTolerance;
+
+  // Check if on either elliptical ear
+  const earTolerance = 0.2;
+  let onEar = false;
+  for (let i = 0; i < ears.length; i++) {
+    const dx = pos.x - ears[i].x;
+    const dy = pos.y - ears[i].y;
+    const norm = (dx * dx) / (earRadiusX * earRadiusX) + (dy * dy) / (earRadiusY * earRadiusY);
+    if (norm >= 1 - earTolerance && norm <= 1 + earTolerance) {
+      onEar = true;
+      break;
+    }
+  }
+
+  return onFace || onEar;
 }
 
 function deleteAllSpheres() {
   document.querySelectorAll(".spawned-sphere").forEach(s => s.remove());
-  coverage.face = 0;
-  coverage.ears = [0, 0];
+  touched.face.fill(false);
+  touched.ears.forEach(ear => ear.fill(false));
   locationText.innerHTML = `✅ All Drawings Cleared`;
   setTimeout(() => { locationText.innerHTML = ""; }, 1000);
 }
