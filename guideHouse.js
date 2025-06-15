@@ -133,7 +133,7 @@ function isNearBodyEdge(pos) {
 }
 
 function isHouseCovered() {
-  return checkpointHits.filter(Boolean).length >= 3;
+  return checkpointHits.filter(Boolean).length >= 4;
 }
 
 // Create a cylinder to represent a line between two 3D points
