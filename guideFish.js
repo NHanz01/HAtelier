@@ -17,7 +17,16 @@ const fishParts = [
   { type: 'cylinder', position: { x: 1.6, y: 1.8 }, height: 0.8, radius: 0.1, rotation: "0 0 120" },  // tail fin 4 (bottom far right)
 ];
 
-const fishCenters = fishParts.map(p => new THREE.Vector2(p.position.x, p.position.y));
+const fishCheckpoints = [
+  new THREE.Vector2(0, 2.7),      // body 1
+  new THREE.Vector2(-0.8, 2.2),   // body 2
+  new THREE.Vector2(1, 2.2),      // body 3
+  new THREE.Vector2(0, 1.4),      // body 4
+  new THREE.Vector2(1.5, 2.5),   // tail 1
+  new THREE.Vector2(1.5, 1.6),   // tail 2
+];
+
+let checkpointHits = new Array(fishCheckpoints.length).fill(false);
 
 // DRAW THE FISH GUIDE ON THE SCENE
 fishParts.forEach(part => {
@@ -43,10 +52,22 @@ fishParts.forEach(part => {
   guideFishEntities.push(entity);
 });
 
+// CHECK CHECKPOINTS
+function checkFishCheckpoint(pos) {
+  for (let i = 0; i < fishCheckpoints.length; i++) {
+    const checkpoint = fishCheckpoints[i];
+    if (!checkpointHits[i] && pos.distanceTo(checkpoint) <= 0.2) {
+      checkpointHits[i] = true;
+      return true;
+    }
+  }
+  return false;
+}
 
-
-let coverage = new Array(fishCenters.length).fill(false);
-const fishCount = fishCenters.length;
+// CHECK SUCCESS COMPLETION OF THE DRAWING
+function isFishCovered() {
+  return checkpointHits.filter(Boolean).length >= 4;
+}
 
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
@@ -151,20 +172,7 @@ function findClosestFishPartIndex(pos) {
   return -1;
 }
 
-
-function markFishCoverage(index) {
-  if (index >= 0 && !coverage[index]) {
-    coverage[index] = true;
-  }
-}
-
-// CHECK SUCCESS COMPLETION OF THE DRAWING
-function isFishCovered() {
-  const count = coverage.filter(v => v).length;
-  return count / fishCount >= 0.6;
-}
-
-// Draw a red sphere on the petal center
+// Draw a red sphere on center
 function drawFishSegment(pos) {
   if (fishCompleted) return;
 
@@ -180,16 +188,19 @@ function drawFishSegment(pos) {
   locationText.innerHTML = `🎨 Drawing on fish parts`;
 
   const index = findClosestFishPartIndex(pos);
-  markFishCoverage(index);
 
+  if (checkFishCheckpoint(pos)) {
+  locationText.innerHTML = `✅ Fish part hit!`;
+  }
+  
   if (isFishCovered()) showSuccessFish();
 }
 
 
 function deleteAllSpheres() {
   document.querySelectorAll(".spawned-sphere").forEach(s => s.remove());
-  for (let i = 0; i < coverage.length; i++) coverage[i] = false;
   locationText.innerHTML = `✅ All Drawings Cleared`;
+  checkpointHits.fill(false);
   setTimeout(() => { locationText.innerHTML = ""; }, 1000);
 }
 
@@ -202,7 +213,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
   hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
 
-
   const label = document.createElement("a-text");
   label.setAttribute("value", "Try To Draw The Fish!");
   label.setAttribute("align", "center");
@@ -211,7 +221,7 @@ window.addEventListener('DOMContentLoaded', () => {
   label.setAttribute("position", "0 0 -4.5");
   label.setAttribute("id", "label-fish");
   document.querySelector("a-scene").appendChild(label);
-
+  
   function onResults(results) {
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
@@ -239,12 +249,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
       visualAidSphere.setAttribute("position", `${fingerX} ${fingerY} ${fixedZ}`);
 
-      // Check proximity to petals
-      const closePetalIndex = findClosestFishPartIndex(fingerPos);
-      const nearPetal = closePetalIndex !== -1;
+      // Check proximity to Fish
+      const closeIndex = findClosestFishPartIndex(fingerPos);
+      const near = closeIndex !== -1;
 
       // Change color based on hit detection
-      visualAidSphere.setAttribute("color", nearPetal ? "royalBlue" : "red");
+      visualAidSphere.setAttribute("color", near ? "royalBlue" : "red");
       visualAidSphere.setAttribute("visible", "true");
 
 
@@ -253,7 +263,7 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById("menu").style.display = "none";
         if (fishCompleted) return;
         drawing = true;
-        if (nearPetal) {
+        if (near) {
           drawFishSegment(fingerPos); 
         } else {
           locationText.innerHTML = `👉 Move finger closer to fish`;
