@@ -35,8 +35,33 @@ const branchIndices = [
   8, 5,  // left edge
 ];
 
-const canopyCoverage = new Array(canopyIndices.length).fill(false);
-const trunkCoverage = new Array(branchIndices.length).fill(false);
+// --- Checkpoint Vertices ---
+const treeCheckpoints = [
+  new THREE.Vector2(0, 2.8),        // Branch 1
+  new THREE.Vector2(-0.3, 2),       //Branch 2
+  new THREE.Vector2(0.3, 2),        //Branch 3
+  new THREE.Vector2(0, 1.5),        //Branch 4
+  new THREE.Vector2(-0.25, 1.0),    // trunk 1
+  new THREE.Vector2(0.25, 1.0),     // trunk 2
+  new THREE.Vector2(0.25, 0.5),     // trunk 3
+  new THREE.Vector2(-0.25, 0.5),    // trunk 4
+];
+
+let checkpointHits = new Array(treeCheckpoints.length).fill(false);
+
+function checkCheckpointProximity(pos) {
+  const threshold = 0.2;
+  treeCheckpoints.forEach((pt, i) => {
+    if (!checkpointHits[i]) {
+      const dx = pt.x - pos.x;
+      const dy = pt.y - pos.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < threshold) {
+        checkpointHits[i] = true;
+      }
+    }
+  });
+}
 
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
@@ -111,21 +136,6 @@ function isNearBranchEdge(pos) {
   return isNearEdge(pos, branchIndices);
 }
 
-function markNearbyEdgesCovered(pos) {
-  [...canopyIndices, canopyIndices[0]].forEach((_, i, arr) => {
-    if (i === arr.length - 1) return;
-    if (isPointNearLineSegment(pos, treeVertices[arr[i]], treeVertices[arr[i + 1]])) {
-      canopyCoverage[i] = true;
-    }
-  });
-
-  for (let i = 0; i < branchIndices.length - 1; i++) {
-    if (isPointNearLineSegment(pos, treeVertices[branchIndices[i]], treeVertices[branchIndices[i + 1]])) {
-      trunkCoverage[i] = true;
-    }
-  }
-}
-
 function isPointNearLineSegment(p, a, b, threshold = 0.15) {
   const ap = { x: p.x - a.x, y: p.y - a.y };
   const ab = { x: b.x - a.x, y: b.y - a.y };
@@ -148,12 +158,8 @@ function isPointNearLineSegment(p, a, b, threshold = 0.15) {
 
 // CHECK COMPLETION SUCCESS
 function isTreeCovered() {
-  const canopyFilled = canopyCoverage.filter(Boolean).length / canopyCoverage.length;
-  const trunkFilled = trunkCoverage.filter(Boolean).length / trunkCoverage.length;
-
-  return canopyFilled >= 0.5 && trunkFilled >= 0.35;
+  return checkpointHits.filter(Boolean).length >= 5;
 }
-
 
 // --- Visual Helpers ---
 function createTreeGuideLines(scene) {
@@ -217,15 +223,15 @@ function drawTreeSphere(pos) {
   document.querySelector("a-scene").appendChild(sphere);
 
   locationText.innerHTML = "🌲 Drawing tree...";
-  markNearbyEdgesCovered(pos);
+  checkCheckpointProximity(pos); 
 
   if (isTreeCovered()) showSuccessTree();
-} 
+}
+ 
 
 function deleteAllSpheres() {
   document.querySelectorAll(".spawned-sphere").forEach(s => s.remove());
-  canopyCoverage.fill(false);
-  trunkCoverage.fill(false);
+  checkpointHits.fill(false);
   treeCompleted = false;
   locationText.innerHTML = "✅ Drawings cleared";
   setTimeout(() => locationText.innerHTML = "", 1000);
