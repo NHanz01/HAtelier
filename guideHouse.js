@@ -1,4 +1,4 @@
-// guideHouse.js - AR House Drawing Guide with Cylinder Lines and MediaPipe Hands
+// guideHouse.js
 
 let initialLatitude = null;
 let initialLongitude = null;
@@ -16,12 +16,32 @@ const houseVertices = [
   new THREE.Vector2(-1, 0.5), // Bottom left body
 ];
 
+const houseCheckpoints = [
+  new THREE.Vector2(0, 3),    // Roof peak
+  new THREE.Vector2(-1, 2),   // Left roof corner
+  new THREE.Vector2(1, 2),    // Right roof corner
+  new THREE.Vector2(1, 0.5),  // Bottom right
+  new THREE.Vector2(-1, 0.5), // Bottom left
+];
+let checkpointHits = new Array(houseCheckpoints.length).fill(false);
+
 const roofIndices = [0, 1, 2];
 const bodyIndices = [1, 2, 3, 4];
-const roofCoverage = new Array(roofIndices.length).fill(false);
-const bodyCoverage = new Array(bodyIndices.length).fill(false);
 const locationText = document.getElementById("locationText");
 
+function checkCheckpointProximity(pos) {
+  const threshold = 0.2;
+  houseCheckpoints.forEach((pt, i) => {
+    if (!checkpointHits[i]) {
+      const dx = pt.x - pos.x;
+      const dy = pt.y - pos.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < threshold) {
+        checkpointHits[i] = true;
+      }
+    }
+  });
+}
 
 // --- Initialization ---
 
@@ -112,27 +132,8 @@ function isNearBodyEdge(pos) {
   return false;
 }
 
-// CHECKING COMPLETION/SUCCESS
-function markVertexCovered(index) {
-  if (index < 0) return;
-
-  if (roofIndices.includes(index)) {
-    const roofIdx = roofIndices.indexOf(index);
-    if (!roofCoverage[roofIdx]) roofCoverage[roofIdx] = true;
-  } else if (bodyIndices.includes(index)) {
-    const bodyIdx = bodyIndices.indexOf(index);
-    if (!bodyCoverage[bodyIdx]) bodyCoverage[bodyIdx] = true;
-  }
-}
-
 function isHouseCovered() {
-  const roofCount = roofCoverage.filter(Boolean).length;
-  const bodyCount = bodyCoverage.filter(Boolean).length;
-
-  const roofPercent = roofCount / roofCoverage.length;
-  const bodyPercent = bodyCount / bodyCoverage.length;
-
-  return roofPercent >= 0.7 && bodyPercent >= 0.5;
+  return checkpointHits.filter(Boolean).length >= 3;
 }
 
 // Create a cylinder to represent a line between two 3D points
@@ -243,7 +244,7 @@ function drawHouseSphere(pos) {
 
   locationText.innerHTML = "🏠 Drawing house outline";
 
-  markNearbyEdgesCovered(pos);
+  checkCheckpointProximity(pos);
 
   if (isHouseCovered()) showSuccessHouse();
 }
@@ -251,9 +252,12 @@ function drawHouseSphere(pos) {
 // Clear all drawn spheres and reset coverage state
 function deleteAllSpheres() {
   document.querySelectorAll(".spawned-sphere").forEach(s => s.remove());
+  checkpointHits.fill(false);
+  houseCompleted = false;
   locationText.innerHTML = "✅ Drawings cleared";
   setTimeout(() => { locationText.innerHTML = ""; }, 1000);
 }
+
 
 // Gesture helpers
 function isFingerExtended(tip, pip) {
