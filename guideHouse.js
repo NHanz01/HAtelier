@@ -17,12 +17,17 @@ const houseVertices = [
 ];
 
 const houseCheckpoints = [
-  new THREE.Vector2(0, 3),    // Roof peak
-  new THREE.Vector2(-1, 2),   // Left roof corner
-  new THREE.Vector2(1, 2),    // Right roof corner
-  new THREE.Vector2(1, 0.5),  // Bottom right
-  new THREE.Vector2(-1, 0.5), // Bottom left
+  new THREE.Vector2(0, 3),               // roof peak
+  new THREE.Vector2(-1, 2),              // left roof corner
+  new THREE.Vector2(1, 2),               // right roof corner
+  new THREE.Vector2(1, 0.5),             // bottom right
+  new THREE.Vector2(-1, 0.5),            // bottom left
+  new THREE.Vector2(0, 2),               // roof base center
+  new THREE.Vector2(1, 1.25),          // right mid body
+  new THREE.Vector2(-1, 1.25),         // left mid body
+  new THREE.Vector2(0, 0.5),             // bottom center
 ];
+
 let checkpointHits = new Array(houseCheckpoints.length).fill(false);
 
 const roofIndices = [0, 1, 2];
@@ -133,7 +138,7 @@ function isNearBodyEdge(pos) {
 }
 
 function isHouseCovered() {
-  return checkpointHits.filter(Boolean).length >= 4;
+  return checkpointHits.filter(Boolean).length >= 7;
 }
 
 // Create a cylinder to represent a line between two 3D points
